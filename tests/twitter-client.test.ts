@@ -119,6 +119,29 @@ describe('TwitterClient', () => {
 			expect(result.success).toBe(false);
 			expect(result.error).toBe('Network error');
 		});
+
+		it('should surface missing tweet ID when API responds without rest_id', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					data: {
+						create_tweet: {
+							tweet_results: {
+								result: {
+									legacy: { full_text: 'No id' },
+								},
+							},
+						},
+					},
+				}),
+			});
+
+			const client = new TwitterClient({ cookies: validCookies });
+			const result = await client.tweet('Hello world!');
+
+			expect(result.success).toBe(false);
+			expect(result.error).toBe('Tweet created but no ID returned');
+		});
 	});
 
 	describe('reply', () => {
@@ -204,6 +227,73 @@ describe('TwitterClient', () => {
 			expect(result.tweet?.id).toBe('12345');
 			expect(result.tweet?.text).toBe('Root tweet text');
 			expect(result.tweet?.author.username).toBe('user');
+		});
+
+		it('should return tweet data found inside conversation instructions', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					data: {
+						threaded_conversation_with_injections_v2: {
+							instructions: [
+								{
+									entries: [
+										{
+											content: {
+												itemContent: {
+													tweet_results: {
+														result: {
+															rest_id: '6789',
+															legacy: {
+																full_text: 'Nested text',
+																created_at: 'Mon Jan 01 00:00:00 +0000 2024',
+																reply_count: 0,
+																retweet_count: 0,
+																favorite_count: 0,
+															},
+															core: {
+																user_results: {
+																	result: {
+																		legacy: {
+																			screen_name: 'nestuser',
+																			name: 'Nested User',
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									],
+								},
+							],
+						},
+					},
+				}),
+			});
+
+			const client = new TwitterClient({ cookies: validCookies });
+			const result = await client.getTweet('6789');
+
+			expect(result.success).toBe(true);
+			expect(result.tweet?.text).toBe('Nested text');
+			expect(result.tweet?.author.username).toBe('nestuser');
+		});
+
+		it('should report HTTP errors from getTweet', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 404,
+				text: async () => 'Not Found',
+			});
+
+			const client = new TwitterClient({ cookies: validCookies });
+			const result = await client.getTweet('missing');
+
+			expect(result.success).toBe(false);
+			expect(result.error).toContain('HTTP 404');
 		});
 	});
 });
