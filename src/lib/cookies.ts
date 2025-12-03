@@ -34,24 +34,41 @@ function getChromeCookiesPath(profile?: string): string {
   return join(home, 'Library', 'Application Support', 'Google', 'Chrome', profileDir, 'Cookies');
 }
 
-function getFirefoxCookiesPath(profile?: string): string | null {
+function getFirefoxProfilesRoot(): string | null {
   const home = process.env.HOME || '';
-  const profilesRoot = join(home, 'Library', 'Application Support', 'Firefox', 'Profiles');
-  if (!existsSync(profilesRoot)) return null;
+  if (process.platform === 'darwin') {
+    return join(home, 'Library', 'Application Support', 'Firefox', 'Profiles');
+  }
+  if (process.platform === 'linux') {
+    return join(home, '.mozilla', 'firefox');
+  }
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA;
+    if (!appData) return null;
+    return join(appData, 'Mozilla', 'Firefox', 'Profiles');
+  }
+  return null;
+}
 
+function pickFirefoxProfile(profilesRoot: string, profile?: string): string | null {
   if (profile) {
     const candidate = join(profilesRoot, profile, 'cookies.sqlite');
     return existsSync(candidate) ? candidate : null;
   }
 
-  // Pick the default-release profile if present, otherwise first profile dir containing cookies.sqlite
   const entries = readdirSync(profilesRoot, { withFileTypes: true });
-  const defaultRelease = entries.find((entry) => entry.isDirectory() && entry.name.endsWith('.default-release'));
+  const defaultRelease = entries.find((entry) => entry.isDirectory() && entry.name.includes('default-release'));
   const targetDir = defaultRelease?.name ?? entries.find((e) => e.isDirectory())?.name;
   if (!targetDir) return null;
 
   const candidate = join(profilesRoot, targetDir, 'cookies.sqlite');
   return existsSync(candidate) ? candidate : null;
+}
+
+function getFirefoxCookiesPath(profile?: string): string | null {
+  const profilesRoot = getFirefoxProfilesRoot();
+  if (!profilesRoot || !existsSync(profilesRoot)) return null;
+  return pickFirefoxProfile(profilesRoot, profile);
 }
 
 /**
@@ -260,7 +277,9 @@ export async function extractCookiesFromFirefox(profile?: string): Promise<Cooki
   }
 
   if (!cookies.authToken && !cookies.ct0) {
-    warnings.push('No Twitter cookies found in Firefox. Make sure you are logged into x.com in Firefox.');
+    warnings.push(
+      'No Twitter cookies found in Firefox. Make sure you are logged into x.com in Firefox and the profile exists.',
+    );
   }
 
   return { cookies, warnings };
@@ -319,22 +338,7 @@ export async function resolveCredentials(options: {
     }
   }
 
-  // 3. Chrome cookies (fallback)
-  if (!cookies.authToken || !cookies.ct0) {
-    const chromeResult = await extractCookiesFromChrome(options.chromeProfile);
-    warnings.push(...chromeResult.warnings);
-
-    if (!cookies.authToken && chromeResult.cookies.authToken) {
-      cookies.authToken = chromeResult.cookies.authToken;
-      cookies.source = chromeResult.cookies.source;
-    }
-    if (!cookies.ct0 && chromeResult.cookies.ct0) {
-      cookies.ct0 = chromeResult.cookies.ct0;
-      if (!cookies.source) cookies.source = chromeResult.cookies.source;
-    }
-  }
-
-  // 4. Firefox cookies (fallback if still missing)
+  // 3. Firefox cookies (preferred browser fallback)
   if (!cookies.authToken || !cookies.ct0) {
     const firefoxResult = await extractCookiesFromFirefox(options.firefoxProfile);
     warnings.push(...firefoxResult.warnings);
@@ -346,6 +350,21 @@ export async function resolveCredentials(options: {
     if (!cookies.ct0 && firefoxResult.cookies.ct0) {
       cookies.ct0 = firefoxResult.cookies.ct0;
       if (!cookies.source) cookies.source = firefoxResult.cookies.source;
+    }
+  }
+
+  // 4. Chrome cookies (secondary browser fallback)
+  if (!cookies.authToken || !cookies.ct0) {
+    const chromeResult = await extractCookiesFromChrome(options.chromeProfile);
+    warnings.push(...chromeResult.warnings);
+
+    if (!cookies.authToken && chromeResult.cookies.authToken) {
+      cookies.authToken = chromeResult.cookies.authToken;
+      cookies.source = chromeResult.cookies.source;
+    }
+    if (!cookies.ct0 && chromeResult.cookies.ct0) {
+      cookies.ct0 = chromeResult.cookies.ct0;
+      if (!cookies.source) cookies.source = chromeResult.cookies.source;
     }
   }
 
