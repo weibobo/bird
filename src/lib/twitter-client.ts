@@ -237,9 +237,7 @@ export class TwitterClient {
     return tweets;
   }
 
-  private async fetchTweetDetail(
-    tweetId: string,
-  ): Promise<
+  private async fetchTweetDetail(tweetId: string): Promise<
     | {
         success: true;
         data: {
@@ -719,6 +717,7 @@ export class TwitterClient {
           continue;
         }
 
+        // biome-ignore lint/suspicious/noExplicitAny: Twitter API response is dynamic here
         let data: any;
         try {
           data = await response.json();
@@ -739,7 +738,7 @@ export class TwitterClient {
             ? data.name
             : typeof data?.user?.name === 'string'
               ? data.user.name
-              : username ?? '';
+              : (username ?? '');
 
         const userId =
           typeof data?.user_id === 'string'

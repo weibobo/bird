@@ -99,9 +99,12 @@ export class SweetisticsClient {
       };
     }
 
-    const success = typeof (data as { success?: unknown })?.success === 'boolean' ? (data as { success: boolean }).success : false;
-    const tweetId = typeof (data as { tweetId?: unknown })?.tweetId === 'string' ? (data as { tweetId?: string }).tweetId : undefined;
-    const errorMessage = typeof (data as { error?: unknown })?.error === 'string' ? (data as { error?: string }).error : undefined;
+    const success =
+      typeof (data as { success?: unknown })?.success === 'boolean' ? (data as { success: boolean }).success : false;
+    const tweetId =
+      typeof (data as { tweetId?: unknown })?.tweetId === 'string' ? (data as { tweetId?: string }).tweetId : undefined;
+    const errorMessage =
+      typeof (data as { error?: unknown })?.error === 'string' ? (data as { error?: string }).error : undefined;
 
     if (!response.ok || !success) {
       const reason = errorMessage || `HTTP ${response.status}`;
@@ -125,6 +128,7 @@ export class SweetisticsClient {
       return { success: false, error: `HTTP ${response.status}` };
     }
 
+    // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
     let data: any;
     try {
       data = await response.json();
@@ -151,6 +155,7 @@ export class SweetisticsClient {
       retweetCount: data.metrics?.retweetCount,
       likeCount: data.metrics?.likeCount,
       conversationId: data.conversationId,
+      // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
       inReplyToStatusId: data.referencedTweets?.find?.((r: any) => r?.type === 'replied_to')?.id,
     };
 
@@ -194,6 +199,7 @@ export class SweetisticsClient {
       return { success: false, error: `HTTP ${response.status}` };
     }
 
+    // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
     let body: any;
     try {
       body = await response.json();
@@ -214,6 +220,7 @@ export class SweetisticsClient {
       return { success: false, error: 'Missing data in Sweetistics search response' };
     }
 
+    // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
     let parsed: any;
     try {
       parsed = typeof dataField === 'string' ? devalueParse(dataField) : dataField;
@@ -225,6 +232,7 @@ export class SweetisticsClient {
     }
 
     const tweetsSection = parsed?.tweets;
+    // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
     const items: any[] = tweetsSection?.items ?? [];
     if (items.length === 0) {
       return { success: true, tweets: [] };
@@ -236,8 +244,8 @@ export class SweetisticsClient {
       const createdAt =
         typeof item.createdAt === 'string'
           ? item.createdAt
-          : item.createdAt?.toString?.() ??
-            (Array.isArray(item.createdAt) && item.createdAt[0] === 'Date' ? item.createdAt[1] : undefined);
+          : (item.createdAt?.toString?.() ??
+            (Array.isArray(item.createdAt) && item.createdAt[0] === 'Date' ? item.createdAt[1] : undefined));
       const metrics = item.full?.metrics ?? item.full ?? item;
 
       return {
@@ -281,6 +289,7 @@ export class SweetisticsClient {
       return { success: false, error: `HTTP ${response.status}` };
     }
 
+    // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
     let body: any;
     try {
       body = await response.json();
@@ -314,6 +323,7 @@ export class SweetisticsClient {
     }
 
     const user = data && typeof data === 'object' ? data : null;
+    // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
     if (!user || typeof (user as any).id !== 'string') {
       return { success: false, error: 'Malformed user payload from Sweetistics' };
     }
@@ -321,10 +331,16 @@ export class SweetisticsClient {
     return {
       success: true,
       user: {
+        // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
         id: String((user as any).id),
-        username: (user as any).username ?? (user as any).twitterUsername ?? null,
+        username:
+          // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
+          (user as any).username ?? (user as any).twitterUsername ?? null,
+        // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
         name: (user as any).name ?? null,
+        // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
         email: (user as any).email ?? null,
+        // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
         profileImageUrl: (user as any).profileImageUrl ?? null,
       },
     };
@@ -362,9 +378,11 @@ export class SweetisticsClient {
       return { success: false, error: 'Missing data in Sweetistics response' };
     }
 
+    // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
     let parsed: any;
     try {
-      const raw = typeof envelope.result.data === 'string' ? devalueParse(envelope.result.data as string) : envelope.result.data;
+      const raw =
+        typeof envelope.result.data === 'string' ? devalueParse(envelope.result.data as string) : envelope.result.data;
       parsed = raw;
     } catch (error) {
       return {
@@ -374,6 +392,7 @@ export class SweetisticsClient {
     }
 
     const tweetIds: string[] = Array.isArray(parsed?.tweetIds) ? parsed.tweetIds.map(String) : [];
+    // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
     const tweetsMap: Record<string, any> = parsed?.tweets ?? {};
 
     if (tweetIds.length === 0 || Object.keys(tweetsMap).length === 0) {
@@ -386,6 +405,7 @@ export class SweetisticsClient {
     const tweets: SweetisticsTweet[] = filteredIds
       .map((id) => tweetsMap[id])
       .filter(Boolean)
+      // biome-ignore lint/suspicious/noExplicitAny: Sweetistics responses are loosely typed
       .map((item: any) => ({
         id: String(item.id),
         text: String(item.text ?? ''),

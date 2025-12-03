@@ -9,16 +9,16 @@
  *   bird read <tweet-id-or-url>
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { Command } from 'commander';
 import JSON5 from 'json5';
 import kleur from 'kleur';
-import { homedir } from 'node:os';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { resolveCredentials } from './lib/cookies.js';
 import { extractTweetId } from './lib/extract-tweet-id.js';
-import { TwitterClient, type TweetData } from './lib/twitter-client.js';
 import { SweetisticsClient } from './lib/sweetistics-client.js';
+import { type TweetData, TwitterClient } from './lib/twitter-client.js';
 
 const program = new Command();
 
@@ -53,7 +53,9 @@ function readConfigFile(path: string): Partial<BirdConfig> {
     const parsed = JSON5.parse(raw) as Partial<BirdConfig>;
     return parsed ?? {};
   } catch (error) {
-    console.error(colors.muted(`⚠️ Failed to parse config at ${path}: ${error instanceof Error ? error.message : String(error)}`));
+    console.error(
+      colors.muted(`⚠️ Failed to parse config at ${path}: ${error instanceof Error ? error.message : String(error)}`),
+    );
     return {};
   }
 }
@@ -82,12 +84,13 @@ const formatExample = (command: string, description: string) =>
 
 program.addHelpText(
   'afterAll',
-  () => `\n${colors.section('Examples')}\n${[
-    formatExample('bird whoami', 'Show the logged-in account via GraphQL cookies'),
-    formatExample('bird --firefox-profile default-release whoami', 'Use Firefox profile cookies'),
-    formatExample('bird tweet "hello from bird"', 'Send a tweet'),
-    formatExample('bird replies https://x.com/user/status/1234567890123456789', 'Check replies to a tweet'),
-  ].join('\n\n')}`,
+  () =>
+    `\n${colors.section('Examples')}\n${[
+      formatExample('bird whoami', 'Show the logged-in account via GraphQL cookies'),
+      formatExample('bird --firefox-profile default-release whoami', 'Use Firefox profile cookies'),
+      formatExample('bird tweet "hello from bird"', 'Send a tweet'),
+      formatExample('bird replies https://x.com/user/status/1234567890123456789', 'Check replies to a tweet'),
+    ].join('\n\n')}`,
 );
 
 // Global options for authentication
@@ -112,10 +115,7 @@ type EngineMode = 'graphql' | 'sweetistics' | 'auto';
 
 function resolveSweetisticsConfig(options: { sweetisticsApiKey?: string; sweetisticsBaseUrl?: string }) {
   const apiKey =
-    options.sweetisticsApiKey ||
-    process.env.SWEETISTICS_API_KEY ||
-    process.env.SWEETISTICS_LOCALHOST_API_KEY ||
-    null;
+    options.sweetisticsApiKey || process.env.SWEETISTICS_API_KEY || process.env.SWEETISTICS_LOCALHOST_API_KEY || null;
 
   const baseUrl = options.sweetisticsBaseUrl || process.env.SWEETISTICS_BASE_URL || 'https://sweetistics.com';
 
@@ -512,7 +512,7 @@ program
   .option('--json', 'Output as JSON')
   .action(async (query: string, cmdOpts: { count?: string; json?: boolean }) => {
     const opts = program.opts();
-    const count = parseInt(cmdOpts.count || '10', 10);
+    const count = Number.parseInt(cmdOpts.count || '10', 10);
     const sweetistics = resolveSweetisticsConfig({
       sweetisticsApiKey: opts.sweetisticsApiKey || config.sweetisticsApiKey,
       sweetisticsBaseUrl: opts.sweetisticsBaseUrl || config.sweetisticsBaseUrl,
@@ -570,7 +570,7 @@ program
   .option('--json', 'Output as JSON')
   .action(async (cmdOpts: { count?: string; json?: boolean }) => {
     const opts = program.opts();
-    const count = parseInt(cmdOpts.count || '10', 10);
+    const count = Number.parseInt(cmdOpts.count || '10', 10);
     const sweetistics = resolveSweetisticsConfig(opts);
     const engine = resolveEngineMode(opts.engine);
     const useSweetistics = shouldUseSweetistics(engine, Boolean(sweetistics.apiKey));

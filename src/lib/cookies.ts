@@ -351,7 +351,9 @@ export async function resolveCredentials(options: {
 
   // Validation
   if (!cookies.authToken) {
-    warnings.push('Missing auth_token - provide via --auth-token, AUTH_TOKEN env var, or login to x.com in Chrome/Firefox');
+    warnings.push(
+      'Missing auth_token - provide via --auth-token, AUTH_TOKEN env var, or login to x.com in Chrome/Firefox',
+    );
   }
   if (!cookies.ct0) {
     warnings.push('Missing ct0 - provide via --ct0, CT0 env var, or login to x.com in Chrome/Firefox');

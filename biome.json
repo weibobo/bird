@@ -28,6 +28,6 @@
     }
   },
   "files": {
-    "ignore": ["dist/", "node_modules/", "*.d.ts"]
+    "ignore": ["dist/", "coverage/", "node_modules/", "scripts/update-query-ids.ts", "*.d.ts"]
   }
 }

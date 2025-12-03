@@ -302,7 +302,7 @@ describe('TwitterClient', () => {
 
     beforeEach(() => {
       mockFetch = vi.fn();
-      global.fetch = mockFetch as any;
+      global.fetch = mockFetch as unknown as typeof fetch;
     });
 
     it('returns mapped user details when present', async () => {
