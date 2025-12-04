@@ -175,6 +175,7 @@ bird --sweetistics-base-url "http://localhost:3000" --sweetistics-api-key "sweet
 ```
 
 When an API key is present, `bird` will use Sweetistics’ `/api/actions/tweet` endpoint and skip local cookie resolution.
+All Sweetistics calls have a 15s timeout so the CLI won’t hang if the API is slow or unreachable.
 
 ### Getting Your Cookies
 

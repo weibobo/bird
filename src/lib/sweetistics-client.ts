@@ -63,6 +63,8 @@ export class SweetisticsClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly userAgent?: string;
+  // Prevent hanging requests; keep Sweetistics calls snappy for CLI users.
+  private static readonly REQUEST_TIMEOUT_MS = 15_000;
 
   constructor(options: SweetisticsClientOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
@@ -79,15 +81,20 @@ export class SweetisticsClient {
       payload.replyToTweetId = replyToTweetId;
     }
 
-    const response = await fetch(`${this.baseUrl}/api/actions/tweet`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${this.apiKey}`,
-        'content-type': 'application/json',
-        ...(this.userAgent ? { 'user-agent': this.userAgent } : {}),
-      },
-      body: JSON.stringify(payload),
-    });
+    let response: Response;
+    try {
+      response = await this.fetchWithTimeout(`${this.baseUrl}/api/actions/tweet`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${this.apiKey}`,
+          'content-type': 'application/json',
+          ...(this.userAgent ? { 'user-agent': this.userAgent } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      return { success: false, error: this.normalizeError(error) };
+    }
 
     let data: unknown;
     try {
@@ -117,12 +124,17 @@ export class SweetisticsClient {
   async read(tweetId: string): Promise<SweetisticsReadResult> {
     // Public REST route that returns a single tweet record
     const url = `${this.baseUrl}/api/tweets/${encodeURIComponent(tweetId)}`;
-    const response = await fetch(url, {
-      headers: {
-        authorization: `Bearer ${this.apiKey}`,
-        ...(this.userAgent ? { 'user-agent': this.userAgent } : {}),
-      },
-    });
+    let response: Response;
+    try {
+      response = await this.fetchWithTimeout(url, {
+        headers: {
+          authorization: `Bearer ${this.apiKey}`,
+          ...(this.userAgent ? { 'user-agent': this.userAgent } : {}),
+        },
+      });
+    } catch (error) {
+      return { success: false, error: this.normalizeError(error) };
+    }
 
     if (!response.ok) {
       return { success: false, error: `HTTP ${response.status}` };
@@ -185,15 +197,20 @@ export class SweetisticsClient {
       ],
     };
 
-    const response = await fetch(`${this.baseUrl}/api/trpc/search.execute?batch=1`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${this.apiKey}`,
-        'content-type': 'application/json',
-        ...(this.userAgent ? { 'user-agent': this.userAgent } : {}),
-      },
-      body: JSON.stringify({ 0: { json: payload } }),
-    });
+    let response: Response;
+    try {
+      response = await this.fetchWithTimeout(`${this.baseUrl}/api/trpc/search.execute?batch=1`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${this.apiKey}`,
+          'content-type': 'application/json',
+          ...(this.userAgent ? { 'user-agent': this.userAgent } : {}),
+        },
+        body: JSON.stringify({ 0: { json: payload } }),
+      });
+    } catch (error) {
+      return { success: false, error: this.normalizeError(error) };
+    }
 
     if (!response.ok) {
       return { success: false, error: `HTTP ${response.status}` };
@@ -271,18 +288,30 @@ export class SweetisticsClient {
       ...(this.userAgent ? { 'user-agent': this.userAgent } : {}),
     } satisfies Record<string, string>;
 
-    let response = await fetch(`${this.baseUrl}/api/trpc/user.getCurrent?batch=1`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ 0: { json: null } }),
-    });
+    let response: Response;
+    try {
+      response = await this.fetchWithTimeout(`${this.baseUrl}/api/trpc/user.getCurrent?batch=1`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ 0: { json: null } }),
+      });
+    } catch (error) {
+      return { success: false, error: this.normalizeError(error) };
+    }
 
     // Some deployments only allow GET for queries; fall back if POST is not allowed
     if (response.status === 405) {
-      response = await fetch(`${this.baseUrl}/api/trpc/user.getCurrent?input=${encodeURIComponent('null')}`, {
-        method: 'GET',
-        headers,
-      });
+      try {
+        response = await this.fetchWithTimeout(
+          `${this.baseUrl}/api/trpc/user.getCurrent?input=${encodeURIComponent('null')}`,
+          {
+            method: 'GET',
+            headers,
+          }
+        );
+      } catch (error) {
+        return { success: false, error: this.normalizeError(error) };
+      }
     }
 
     if (!response.ok) {
@@ -353,12 +382,17 @@ export class SweetisticsClient {
     const url = new URL(`${this.baseUrl}/api/trpc/tweets.getConversation`);
     url.searchParams.set('input', JSON.stringify({ tweetId }));
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        authorization: `Bearer ${this.apiKey}`,
-        ...(this.userAgent ? { 'user-agent': this.userAgent } : {}),
-      },
-    });
+    let response: Response;
+    try {
+      response = await this.fetchWithTimeout(url.toString(), {
+        headers: {
+          authorization: `Bearer ${this.apiKey}`,
+          ...(this.userAgent ? { 'user-agent': this.userAgent } : {}),
+        },
+      });
+    } catch (error) {
+      return { success: false, error: this.normalizeError(error) };
+    }
 
     if (!response.ok) {
       return { success: false, error: `HTTP ${response.status}` };
@@ -422,5 +456,29 @@ export class SweetisticsClient {
       }));
 
     return { success: true, tweets };
+  }
+
+  private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(new Error(`Request timed out after ${SweetisticsClient.REQUEST_TIMEOUT_MS}ms`)),
+      SweetisticsClient.REQUEST_TIMEOUT_MS,
+    );
+
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  private normalizeError(error: unknown): string {
+    if (error instanceof Error) {
+      if ((error as { name?: string }).name === 'AbortError') {
+        return 'Request timed out';
+      }
+      return error.message;
+    }
+    return String(error);
   }
 }
