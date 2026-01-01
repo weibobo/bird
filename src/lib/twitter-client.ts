@@ -2146,7 +2146,7 @@ export class TwitterClient {
       });
 
       for (const queryId of queryIds) {
-        const url = `${TWITTER_API_BASE}/${queryId}/BookmarkFolderTimeline?${params}`;
+        const url = `${TWITTER_API_BASE}/${queryId}/BookmarkFolderTimeline?${params.toString()}`;
 
         try {
           const response = await this.fetchWithTimeout(url, {
