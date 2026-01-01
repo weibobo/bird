@@ -1242,6 +1242,148 @@ describe('TwitterClient', () => {
       expect(firstVars.cursor).toBeUndefined();
       expect(secondVars.cursor).toBe('cursor-1');
     });
+
+    it('stops paginating when the cursor repeats', async () => {
+      const makeSearchEntry = (id: string) => ({
+        content: {
+          itemContent: {
+            tweet_results: {
+              result: {
+                rest_id: id,
+                legacy: {
+                  full_text: `tweet-${id}`,
+                  created_at: '2024-01-01T00:00:00Z',
+                  reply_count: 0,
+                  retweet_count: 0,
+                  favorite_count: 0,
+                  conversation_id_str: id,
+                },
+                core: {
+                  user_results: {
+                    result: { legacy: { screen_name: 'root', name: 'Root' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const makeResponse = (ids: string[], cursor: string) => ({
+        data: {
+          search_by_raw_query: {
+            search_timeline: {
+              timeline: {
+                instructions: [
+                  {
+                    entries: [
+                      ...ids.map((id) => makeSearchEntry(id)),
+                      { content: { cursorType: 'Bottom', value: cursor } },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      });
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => makeResponse(['1', '2'], 'same-cursor'),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => makeResponse(['3'], 'same-cursor'),
+        });
+
+      const client = new TwitterClient({ cookies: validCookies });
+      const result = await client.search('needle', 4);
+
+      expect(result.success).toBe(true);
+      expect(result.tweets?.map((tweet) => tweet.id)).toEqual(['1', '2', '3']);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('stops paginating when the next page is empty', async () => {
+      const makeSearchEntry = (id: string) => ({
+        content: {
+          itemContent: {
+            tweet_results: {
+              result: {
+                rest_id: id,
+                legacy: {
+                  full_text: `tweet-${id}`,
+                  created_at: '2024-01-01T00:00:00Z',
+                  reply_count: 0,
+                  retweet_count: 0,
+                  favorite_count: 0,
+                  conversation_id_str: id,
+                },
+                core: {
+                  user_results: {
+                    result: { legacy: { screen_name: 'root', name: 'Root' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              search_by_raw_query: {
+                search_timeline: {
+                  timeline: {
+                    instructions: [
+                      {
+                        entries: [
+                          makeSearchEntry('1'),
+                          { content: { cursorType: 'Bottom', value: 'cursor-1' } },
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              search_by_raw_query: {
+                search_timeline: {
+                  timeline: {
+                    instructions: [
+                      {
+                        entries: [{ content: { cursorType: 'Bottom', value: 'cursor-2' } }],
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          }),
+        });
+
+      const client = new TwitterClient({ cookies: validCookies });
+      const result = await client.search('needle', 3);
+
+      expect(result.success).toBe(true);
+      expect(result.tweets?.map((tweet) => tweet.id)).toEqual(['1']);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('bookmarks', () => {
