@@ -1377,39 +1377,37 @@ describe('TwitterClient', () => {
     });
 
     it('refreshes query IDs after 404s', async () => {
-      mockFetch
-        .mockResolvedValueOnce({ ok: false, status: 404, text: async () => 'nope' })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => ({
-            data: {
-              user: {
-                result: {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404, text: async () => 'nope' }).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: {
+            user: {
+              result: {
+                timeline: {
                   timeline: {
-                    timeline: {
-                      instructions: [
-                        {
-                          entries: [
-                            {
-                              content: {
-                                itemContent: {
-                                  user_results: {
-                                    result: makeUserResult('1', 'alpha', 'Alpha'),
-                                  },
+                    instructions: [
+                      {
+                        entries: [
+                          {
+                            content: {
+                              itemContent: {
+                                user_results: {
+                                  result: makeUserResult('1', 'alpha', 'Alpha'),
                                 },
                               },
                             },
-                          ],
-                        },
-                      ],
-                    },
+                          },
+                        ],
+                      },
+                    ],
                   },
                 },
               },
             },
-          }),
-        });
+          },
+        }),
+      });
 
       const client = new TwitterClient({ cookies: validCookies });
       const clientPrivate = client as unknown as TwitterClient & {
