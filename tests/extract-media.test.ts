@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { extractMedia } from '../src/lib/twitter-client-utils.js';
 import type { GraphqlTweetResult } from '../src/lib/twitter-client-types.js';
+import { extractMedia } from '../src/lib/twitter-client-utils.js';
 
 describe('extractMedia', () => {
   it('returns undefined when no legacy data', () => {
@@ -38,7 +38,8 @@ describe('extractMedia', () => {
 
     const media = extractMedia(result);
     expect(media).toHaveLength(1);
-    expect(media![0]).toEqual({
+    const item = media?.[0];
+    expect(item).toEqual({
       type: 'photo',
       url: 'https://pbs.twimg.com/media/test.jpg',
       width: 1920,
@@ -65,9 +66,10 @@ describe('extractMedia', () => {
     };
 
     const media = extractMedia(result);
-    expect(media![0].width).toBe(1200);
-    expect(media![0].height).toBe(675);
-    expect(media![0].previewUrl).toBeUndefined();
+    const item = media?.[0];
+    expect(item?.width).toBe(1200);
+    expect(item?.height).toBe(675);
+    expect(item?.previewUrl).toBeUndefined();
   });
 
   it('extracts video with highest bitrate mp4', () => {
@@ -99,7 +101,8 @@ describe('extractMedia', () => {
 
     const media = extractMedia(result);
     expect(media).toHaveLength(1);
-    expect(media![0]).toEqual({
+    const item = media?.[0];
+    expect(item).toEqual({
       type: 'video',
       url: 'https://pbs.twimg.com/ext_tw_video_thumb/123/img/thumb.jpg',
       width: 1280,
@@ -132,7 +135,8 @@ describe('extractMedia', () => {
 
     const media = extractMedia(result);
     expect(media).toHaveLength(1);
-    expect(media![0].videoUrl).toBe('https://video.twimg.com/no-bitrate.mp4');
+    const item = media?.[0];
+    expect(item?.videoUrl).toBe('https://video.twimg.com/no-bitrate.mp4');
   });
 
   it('extracts animated_gif with video url', () => {
@@ -160,9 +164,10 @@ describe('extractMedia', () => {
 
     const media = extractMedia(result);
     expect(media).toHaveLength(1);
-    expect(media![0].type).toBe('animated_gif');
-    expect(media![0].videoUrl).toBe('https://video.twimg.com/tweet_video/test.mp4');
-    expect(media![0].durationMs).toBeUndefined();
+    const item = media?.[0];
+    expect(item?.type).toBe('animated_gif');
+    expect(item?.videoUrl).toBe('https://video.twimg.com/tweet_video/test.mp4');
+    expect(item?.durationMs).toBeUndefined();
   });
 
   it('keeps zero duration for videos', () => {
@@ -185,7 +190,8 @@ describe('extractMedia', () => {
 
     const media = extractMedia(result);
     expect(media).toHaveLength(1);
-    expect(media![0].durationMs).toBe(0);
+    const item = media?.[0];
+    expect(item?.durationMs).toBe(0);
   });
 
   it('handles multiple media items', () => {
@@ -217,12 +223,13 @@ describe('extractMedia', () => {
       },
     };
 
-    const media = extractMedia(result);
+    const media = extractMedia(result) ?? [];
     expect(media).toHaveLength(3);
-    expect(media![0].type).toBe('photo');
-    expect(media![1].type).toBe('photo');
-    expect(media![2].type).toBe('video');
-    expect(media![2].videoUrl).toBe('https://video.twimg.com/vid.mp4');
+    const [first, second, third] = media;
+    expect(first?.type).toBe('photo');
+    expect(second?.type).toBe('photo');
+    expect(third?.type).toBe('video');
+    expect(third?.videoUrl).toBe('https://video.twimg.com/vid.mp4');
   });
 
   it('skips items missing type or url', () => {
@@ -244,7 +251,8 @@ describe('extractMedia', () => {
 
     const media = extractMedia(result);
     expect(media).toHaveLength(1);
-    expect(media![0].url).toBe('https://pbs.twimg.com/media/valid.jpg');
+    const item = media?.[0];
+    expect(item?.url).toBe('https://pbs.twimg.com/media/valid.jpg');
   });
 
   it('prefers extended_entities over entities', () => {
@@ -272,7 +280,8 @@ describe('extractMedia', () => {
     };
 
     const media = extractMedia(result);
-    expect(media![0].url).toBe('https://pbs.twimg.com/media/from_extended.jpg');
+    const item = media?.[0];
+    expect(item?.url).toBe('https://pbs.twimg.com/media/from_extended.jpg');
   });
 
   it('falls back to entities when extended_entities missing', () => {
@@ -291,7 +300,8 @@ describe('extractMedia', () => {
     };
 
     const media = extractMedia(result);
-    expect(media![0].url).toBe('https://pbs.twimg.com/media/from_entities.jpg');
+    const item = media?.[0];
+    expect(item?.url).toBe('https://pbs.twimg.com/media/from_entities.jpg');
   });
 
   it('handles video without mp4 variants', () => {
@@ -305,9 +315,7 @@ describe('extractMedia', () => {
               sizes: { large: { w: 1280, h: 720, resize: 'fit' } },
               video_info: {
                 duration_millis: 10000,
-                variants: [
-                  { content_type: 'application/x-mpegURL', url: 'https://video.twimg.com/pl.m3u8' },
-                ],
+                variants: [{ content_type: 'application/x-mpegURL', url: 'https://video.twimg.com/pl.m3u8' }],
               },
             },
           ],
@@ -316,8 +324,9 @@ describe('extractMedia', () => {
     };
 
     const media = extractMedia(result);
-    expect(media![0].type).toBe('video');
-    expect(media![0].videoUrl).toBeUndefined();
-    expect(media![0].durationMs).toBe(10000);
+    const item = media?.[0];
+    expect(item?.type).toBe('video');
+    expect(item?.videoUrl).toBeUndefined();
+    expect(item?.durationMs).toBe(10000);
   });
 });

@@ -1,4 +1,4 @@
-import type { GraphqlMediaEntity, GraphqlTweetResult, TweetData, TweetMedia, TwitterUser } from './twitter-client-types.js';
+import type { GraphqlTweetResult, TweetData, TweetMedia, TwitterUser } from './twitter-client-types.js';
 
 export function normalizeQuoteDepth(value?: number): number {
   if (value === undefined || value === null) {
