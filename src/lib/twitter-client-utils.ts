@@ -189,18 +189,21 @@ export function extractMedia(result: GraphqlTweetResult | undefined): TweetMedia
 
     // Extract video URL for video/animated_gif
     if ((item.type === 'video' || item.type === 'animated_gif') && item.video_info?.variants) {
-      // Find highest bitrate mp4 variant
-      const mp4Variants = item.video_info.variants
-        .filter((v): v is { bitrate: number; content_type: string; url: string } =>
-          v.content_type === 'video/mp4' && typeof v.bitrate === 'number' && typeof v.url === 'string'
-        )
+      // Prefer highest bitrate MP4, fall back to first MP4 when bitrate is missing.
+      const mp4Variants = item.video_info.variants.filter(
+        (v): v is { bitrate?: number; content_type: string; url: string } =>
+          v.content_type === 'video/mp4' && typeof v.url === 'string',
+      );
+      const mp4WithBitrate = mp4Variants
+        .filter((v): v is { bitrate: number; content_type: string; url: string } => typeof v.bitrate === 'number')
         .sort((a, b) => b.bitrate - a.bitrate);
+      const selectedVariant = mp4WithBitrate[0] ?? mp4Variants[0];
 
-      if (mp4Variants.length > 0) {
-        mediaItem.videoUrl = mp4Variants[0].url;
+      if (selectedVariant) {
+        mediaItem.videoUrl = selectedVariant.url;
       }
 
-      if (item.video_info.duration_millis) {
+      if (typeof item.video_info.duration_millis === 'number') {
         mediaItem.durationMs = item.video_info.duration_millis;
       }
     }

@@ -110,6 +110,31 @@ describe('extractMedia', () => {
     });
   });
 
+  it('falls back to first mp4 when bitrate is missing', () => {
+    const result: GraphqlTweetResult = {
+      legacy: {
+        extended_entities: {
+          media: [
+            {
+              type: 'video',
+              media_url_https: 'https://pbs.twimg.com/ext_tw_video_thumb/123/img/thumb.jpg',
+              video_info: {
+                variants: [
+                  { content_type: 'video/mp4', url: 'https://video.twimg.com/no-bitrate.mp4' },
+                  { content_type: 'application/x-mpegURL', url: 'https://video.twimg.com/pl.m3u8' },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    const media = extractMedia(result);
+    expect(media).toHaveLength(1);
+    expect(media![0].videoUrl).toBe('https://video.twimg.com/no-bitrate.mp4');
+  });
+
   it('extracts animated_gif with video url', () => {
     const result: GraphqlTweetResult = {
       legacy: {
@@ -138,6 +163,29 @@ describe('extractMedia', () => {
     expect(media![0].type).toBe('animated_gif');
     expect(media![0].videoUrl).toBe('https://video.twimg.com/tweet_video/test.mp4');
     expect(media![0].durationMs).toBeUndefined();
+  });
+
+  it('keeps zero duration for videos', () => {
+    const result: GraphqlTweetResult = {
+      legacy: {
+        extended_entities: {
+          media: [
+            {
+              type: 'video',
+              media_url_https: 'https://pbs.twimg.com/ext_tw_video_thumb/zero.jpg',
+              video_info: {
+                duration_millis: 0,
+                variants: [{ content_type: 'video/mp4', url: 'https://video.twimg.com/zero.mp4' }],
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    const media = extractMedia(result);
+    expect(media).toHaveLength(1);
+    expect(media![0].durationMs).toBe(0);
   });
 
   it('handles multiple media items', () => {
