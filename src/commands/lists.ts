@@ -79,7 +79,7 @@ export function registerListsCommand(program: Command, ctx: CliContext): void {
     .description('Get tweets from a list timeline')
     .option('-n, --count <number>', 'Number of tweets to fetch', '20')
     .option('--all', 'Fetch all tweets from list (paged). WARNING: your account might get banned using this flag')
-    .option('--max-pages <number>', 'Stop after N pages when using --all')
+    .option('--max-pages <number>', 'Fetch N pages (implies --all)')
     .option('--cursor <string>', 'Resume pagination from a cursor')
     .option('--json', 'Output as JSON')
     .option('--json-full', 'Output as JSON with full raw API response in _raw field')
@@ -96,11 +96,7 @@ export function registerListsCommand(program: Command, ctx: CliContext): void {
         process.exit(2);
       }
 
-      const usePagination = cmdOpts.all || cmdOpts.cursor;
-      if (maxPages !== undefined && !usePagination) {
-        console.error(`${ctx.p('err')}--max-pages requires --all or --cursor.`);
-        process.exit(1);
-      }
+      const usePagination = cmdOpts.all || cmdOpts.cursor || maxPages !== undefined;
       if (!usePagination && (!Number.isFinite(count) || count <= 0)) {
         console.error(`${ctx.p('err')}Invalid --count. Expected a positive integer.`);
         process.exit(1);
