@@ -8,6 +8,7 @@ import { type TwitterClientPostingMethods, withPosting } from './twitter-client-
 import { type TwitterClientSearchMethods, withSearch } from './twitter-client-search.js';
 import { type TwitterClientTimelineMethods, withTimelines } from './twitter-client-timelines.js';
 import { type TwitterClientTweetDetailMethods, withTweetDetails } from './twitter-client-tweet-detail.js';
+import { type TwitterClientUserTweetsMethods, withUserTweets } from './twitter-client-user-tweets.js';
 import { type TwitterClientUserMethods, withUsers } from './twitter-client-users.js';
 
 type TwitterClientInstance = TwitterClientBase &
@@ -19,11 +20,14 @@ type TwitterClientInstance = TwitterClientBase &
   TwitterClientSearchMethods &
   TwitterClientTimelineMethods &
   TwitterClientTweetDetailMethods &
-  TwitterClientUserMethods;
+  TwitterClientUserMethods &
+  TwitterClientUserTweetsMethods;
 
-const MixedTwitterClient = withUsers(
-  withLists(
-    withHome(withTimelines(withSearch(withTweetDetails(withPosting(withBookmarks(withMedia(TwitterClientBase))))))),
+const MixedTwitterClient = withUserTweets(
+  withUsers(
+    withLists(
+      withHome(withTimelines(withSearch(withTweetDetails(withPosting(withBookmarks(withMedia(TwitterClientBase)))))))),
+    ),
   ),
 ) as AbstractConstructor<TwitterClientInstance>;
 
