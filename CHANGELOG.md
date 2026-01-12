@@ -11,6 +11,7 @@
 - Long-form article tweets now render rich Draft.js content blocks/entities (#36) — thanks @crcatala.
 - `news`/`trending` command for Explore tabs with AI-curated headlines (#39) — thanks @aavetis.
 - `search` now supports pagination (`--all`, `--max-pages`, `--cursor`) (#42) — thanks @pjtf93.
+- `likes` now supports pagination (`--all`, `--max-pages`, `--cursor`) (#44) — thanks @jsholmes.
 
 ### Changed
 - Library typing: `SearchResult` is now a discriminated union (so `error` only exists when `success: false`).

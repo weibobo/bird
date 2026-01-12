@@ -204,7 +204,7 @@ export function withTimelines<TBase extends AbstractConstructor<TwitterClientBas
         return { success: false as const, error: firstAttempt.error };
       };
 
-      const unlimited = !Number.isFinite(limit);
+      const unlimited = limit === Number.POSITIVE_INFINITY;
       while (unlimited || tweets.length < limit) {
         const pageCount = unlimited ? pageSize : Math.min(pageSize, limit - tweets.length);
         const page = await fetchWithRefresh(pageCount, cursor);
@@ -382,7 +382,7 @@ export function withTimelines<TBase extends AbstractConstructor<TwitterClientBas
         return { success: false as const, error: firstAttempt.error };
       };
 
-      const unlimited = !Number.isFinite(limit);
+      const unlimited = limit === Number.POSITIVE_INFINITY;
       while (unlimited || tweets.length < limit) {
         const pageCount = unlimited ? pageSize : Math.min(pageSize, limit - tweets.length);
         const page = await fetchWithRefresh(pageCount, cursor);
@@ -565,7 +565,7 @@ export function withTimelines<TBase extends AbstractConstructor<TwitterClientBas
         return { success: false as const, error: firstAttempt.error };
       };
 
-      const unlimited = !Number.isFinite(limit);
+      const unlimited = limit === Number.POSITIVE_INFINITY;
       while (unlimited || tweets.length < limit) {
         const pageCount = unlimited ? pageSize : Math.min(pageSize, limit - tweets.length);
         const page = await fetchWithRefresh(pageCount, cursor);
