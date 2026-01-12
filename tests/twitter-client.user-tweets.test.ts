@@ -394,6 +394,61 @@ describe('TwitterClient getUserTweetsPaged', () => {
     global.fetch = mockFetch as unknown as typeof fetch;
   });
 
+  it('requests only the remaining count', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () =>
+        makeTimelineResponse(
+          [makeTweetResult('1', 'Tweet 1'), makeTweetResult('2', 'Tweet 2'), makeTweetResult('3', 'Tweet 3')],
+          'cursor-2',
+        ),
+    });
+
+    const client = new TwitterClient({ cookies: validCookies });
+    const result = await client.getUserTweetsPaged('12345', 5, { pageDelayMs: 0 });
+
+    expect(result.success).toBe(true);
+
+    const [url] = mockFetch.mock.calls[0];
+    const variablesRaw = new URL(url).searchParams.get('variables');
+    expect(variablesRaw).not.toBeNull();
+    const variables = JSON.parse(String(variablesRaw)) as { count?: number };
+    expect(variables.count).toBe(5);
+  });
+
+  it('enforces a hard 10 page cap by default', async () => {
+    for (let page = 1; page <= 10; page += 1) {
+      const startId = (page - 1) * 20 + 1;
+      const tweets = Array.from({ length: 20 }, (_v, index) => {
+        const id = String(startId + index);
+        return makeTweetResult(id, `Tweet ${id}`);
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => makeTimelineResponse(tweets, `cursor-${page + 1}`),
+      });
+    }
+
+    const client = new TwitterClient({ cookies: validCookies });
+    const result = await client.getUserTweetsPaged('12345', 9999, { pageDelayMs: 0 });
+
+    expect(result.success).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(10);
+    expect(result.tweets?.length).toBe(200);
+    expect(result.nextCursor).toBe('cursor-11');
+  });
+
+  it('returns error for invalid limit', async () => {
+    const client = new TwitterClient({ cookies: validCookies });
+    const result = await client.getUserTweetsPaged('12345', 0);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid limit');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it('fetches multiple pages with cursor', async () => {
     mockFetch
       .mockResolvedValueOnce({

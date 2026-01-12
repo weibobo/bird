@@ -284,6 +284,35 @@ d('live CLI (Twitter/X)', () => {
     expect(tweets[0].author?.username?.toLowerCase()).toBe(testHandle.toLowerCase());
   });
 
+  it('user-tweets paged JSON returns { tweets, nextCursor }', async () => {
+    const testHandle =
+      process.env.BIRD_LIVE_USER_TWEETS_PAGED_HANDLE ?? process.env.BIRD_LIVE_USER_TWEETS_HANDLE ?? 'X';
+    const userTweets = await runBird(
+      [
+        ...baseArgs,
+        '--cookie-timeout',
+        cookieTimeoutArg,
+        'user-tweets',
+        testHandle,
+        '-n',
+        '50',
+        '--max-pages',
+        '3',
+        '--delay',
+        '0',
+        '--json',
+      ],
+      {
+        timeoutMs: 45_000,
+      },
+    );
+    expect(userTweets.exitCode).toBe(0);
+    const payload = parseJson<{ tweets?: Array<{ id?: string }>; nextCursor?: string | null }>(userTweets.stdout);
+    expect(Array.isArray(payload.tweets)).toBe(true);
+    expect(payload.tweets?.length).toBeGreaterThan(0);
+    expect(payload.tweets?.[0]?.id?.length).toBeGreaterThan(0);
+  });
+
   it('query-ids returns JSON', async () => {
     const queryIds = await runBird([...baseArgs, '--cookie-timeout', cookieTimeoutArg, 'query-ids', '--json'], {
       timeoutMs: 60_000,
