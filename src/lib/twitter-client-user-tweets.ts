@@ -33,7 +33,7 @@ export interface UserLookupResult {
 export interface TwitterClientUserTweetsMethods {
   getUserIdByUsername(username: string): Promise<UserLookupResult>;
   getUserTweets(userId: string, count?: number, options?: UserTweetsFetchOptions): Promise<SearchResult>;
-  getUserTweetsPaged(userId: string, options?: UserTweetsPaginationOptions): Promise<SearchResult>;
+  getUserTweetsPaged(userId: string, limit: number, options?: UserTweetsPaginationOptions): Promise<SearchResult>;
 }
 
 export function withUserTweets<TBase extends AbstractConstructor<TwitterClientBase>>(
@@ -169,7 +169,7 @@ export function withUserTweets<TBase extends AbstractConstructor<TwitterClientBa
 
     /**
      * Look up a user's ID by their username/handle.
-     * Uses Twitter's REST API endpoint.
+     * Uses GraphQL UserByScreenName first, then falls back to REST on transient failures.
      */
     async getUserIdByUsername(username: string): Promise<UserLookupResult> {
       // Normalize and validate handle
@@ -245,24 +245,22 @@ export function withUserTweets<TBase extends AbstractConstructor<TwitterClientBa
      * Get tweets from a user's profile timeline (single page).
      */
     async getUserTweets(userId: string, count = 20, options: UserTweetsFetchOptions = {}): Promise<SearchResult> {
-      const result = await this.getUserTweetsPaged(userId, {
-        ...options,
-        maxPages: 1,
-      });
-
-      // Trim to requested count
-      if (result.success && result.tweets && result.tweets.length > count) {
-        result.tweets = result.tweets.slice(0, count);
-      }
-
-      return result;
+      return this.getUserTweetsPaged(userId, count, options);
     }
 
     /**
      * Get tweets from a user's profile timeline with pagination support.
      */
-    async getUserTweetsPaged(userId: string, options: UserTweetsPaginationOptions = {}): Promise<SearchResult> {
-      const { includeRaw = false, maxPages = 1, pageDelayMs = 1000 } = options;
+    async getUserTweetsPaged(
+      userId: string,
+      limit: number,
+      options: UserTweetsPaginationOptions = {},
+    ): Promise<SearchResult> {
+      if (!Number.isFinite(limit) || limit <= 0) {
+        return { success: false, error: `Invalid limit: ${limit}` };
+      }
+
+      const { includeRaw = false, maxPages, pageDelayMs = 1000 } = options;
       const features = buildUserTweetsFeatures();
       const pageSize = 20;
       const seen = new Set<string>();
@@ -270,15 +268,18 @@ export function withUserTweets<TBase extends AbstractConstructor<TwitterClientBa
       let cursor: string | undefined = options.cursor;
       let nextCursor: string | undefined;
       let pagesFetched = 0;
+      const hardMaxPages = 10;
+      const computedMaxPages = Math.max(1, Math.ceil(limit / pageSize));
+      const effectiveMaxPages = Math.min(hardMaxPages, maxPages ?? computedMaxPages);
 
-      const fetchPage = async (pageCursor?: string) => {
+      const fetchPage = async (pageCount: number, pageCursor?: string) => {
         let lastError: string | undefined;
         let had404 = false;
         const queryIds = await this.getUserTweetsQueryIds();
 
         const variables = {
           userId,
-          count: pageSize,
+          count: pageCount,
           includePromotedContent: false, // Filter out ads
           withQuickPromoteEligibilityTweetFields: true,
           withVoice: true,
@@ -396,14 +397,14 @@ export function withUserTweets<TBase extends AbstractConstructor<TwitterClientBa
         return { success: false as const, error: lastError ?? 'Unknown error fetching user tweets', had404 };
       };
 
-      const fetchWithRefresh = async (pageCursor?: string) => {
-        const firstAttempt = await fetchPage(pageCursor);
+      const fetchWithRefresh = async (pageCount: number, pageCursor?: string) => {
+        const firstAttempt = await fetchPage(pageCount, pageCursor);
         if (firstAttempt.success) {
           return firstAttempt;
         }
         if (firstAttempt.had404) {
           await this.refreshQueryIds();
-          const secondAttempt = await fetchPage(pageCursor);
+          const secondAttempt = await fetchPage(pageCount, pageCursor);
           if (secondAttempt.success) {
             return secondAttempt;
           }
@@ -412,33 +413,41 @@ export function withUserTweets<TBase extends AbstractConstructor<TwitterClientBa
         return { success: false as const, error: firstAttempt.error };
       };
 
-      while (pagesFetched < maxPages) {
+      while (tweets.length < limit) {
         // Add delay between pages (but not before the first page)
         if (pagesFetched > 0 && pageDelayMs > 0) {
           await this.sleep(pageDelayMs);
         }
 
-        const page = await fetchWithRefresh(cursor);
+        const remaining = limit - tweets.length;
+        const pageCount = Math.min(pageSize, remaining);
+        const page = await fetchWithRefresh(pageCount, cursor);
         if (!page.success) {
-          // If we have some tweets already, return them with the error
-          if (tweets.length > 0) {
-            return { success: true, tweets, nextCursor: cursor, error: page.error };
-          }
           return { success: false, error: page.error };
         }
         pagesFetched += 1;
 
+        let added = 0;
         for (const tweet of page.tweets) {
           if (seen.has(tweet.id)) {
             continue;
           }
           seen.add(tweet.id);
           tweets.push(tweet);
+          added += 1;
+          if (tweets.length >= limit) {
+            break;
+          }
         }
 
         const pageCursor = page.cursor;
-        if (!pageCursor || pageCursor === cursor || page.tweets.length === 0) {
+        if (!pageCursor || pageCursor === cursor || page.tweets.length === 0 || added === 0) {
           nextCursor = undefined;
+          break;
+        }
+
+        if (pagesFetched >= effectiveMaxPages) {
+          nextCursor = pageCursor;
           break;
         }
 

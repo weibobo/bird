@@ -299,7 +299,7 @@ describe('TwitterClient getUserTweets', () => {
     });
 
     const client = new TwitterClient({ cookies: validCookies });
-    const result = await client.getUserTweetsPaged('12345', { maxPages: 1 });
+    const result = await client.getUserTweetsPaged('12345', 20, { maxPages: 1 });
 
     expect(result.success).toBe(true);
     expect(result.nextCursor).toBe('next-cursor-abc');
@@ -408,7 +408,7 @@ describe('TwitterClient getUserTweetsPaged', () => {
       });
 
     const client = new TwitterClient({ cookies: validCookies });
-    const result = await client.getUserTweetsPaged('12345', {
+    const result = await client.getUserTweetsPaged('12345', 40, {
       maxPages: 2,
       pageDelayMs: 0, // No delay for tests
     });
@@ -435,7 +435,7 @@ describe('TwitterClient getUserTweetsPaged', () => {
       });
 
     const client = new TwitterClient({ cookies: validCookies });
-    const result = await client.getUserTweetsPaged('12345', {
+    const result = await client.getUserTweetsPaged('12345', 40, {
       maxPages: 2,
       pageDelayMs: 0,
     });
@@ -459,7 +459,7 @@ describe('TwitterClient getUserTweetsPaged', () => {
       });
 
     const client = new TwitterClient({ cookies: validCookies });
-    const result = await client.getUserTweetsPaged('12345', {
+    const result = await client.getUserTweetsPaged('12345', 100, {
       maxPages: 5,
       pageDelayMs: 0,
     });
@@ -488,7 +488,7 @@ describe('TwitterClient getUserTweetsPaged', () => {
       });
 
     const client = new TwitterClient({ cookies: validCookies });
-    const result = await client.getUserTweetsPaged('12345', {
+    const result = await client.getUserTweetsPaged('12345', 40, {
       maxPages: 2,
       pageDelayMs: 0,
     });
@@ -506,7 +506,7 @@ describe('TwitterClient getUserTweetsPaged', () => {
     });
 
     const client = new TwitterClient({ cookies: validCookies });
-    const result = await client.getUserTweetsPaged('12345', {
+    const result = await client.getUserTweetsPaged('12345', 20, {
       maxPages: 1,
       cursor: 'resume-cursor-xyz',
       pageDelayMs: 0,

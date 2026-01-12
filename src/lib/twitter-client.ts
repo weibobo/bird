@@ -26,7 +26,7 @@ type TwitterClientInstance = TwitterClientBase &
 const MixedTwitterClient = withUserTweets(
   withUsers(
     withLists(
-      withHome(withTimelines(withSearch(withTweetDetails(withPosting(withBookmarks(withMedia(TwitterClientBase)))))))),
+      withHome(withTimelines(withSearch(withTweetDetails(withPosting(withBookmarks(withMedia(TwitterClientBase))))))),
     ),
   ),
 ) as AbstractConstructor<TwitterClientInstance>;

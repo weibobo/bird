@@ -12,7 +12,7 @@ export function registerUserTweetsCommand(program: Command, ctx: CliContext): vo
     .description("Get tweets from a user's profile timeline")
     .argument('<handle>', 'Username to fetch tweets from (e.g., @steipete or steipete)')
     .option('-n, --count <number>', 'Number of tweets to fetch', '20')
-    .option('--pages <number>', 'Number of pages to fetch (max: 10)', '1')
+    .option('--max-pages <number>', 'Stop after N pages (max: 10)')
     .option('--delay <ms>', 'Delay in ms between page fetches', '1000')
     .option('--cursor <string>', 'Resume pagination from a cursor')
     .option('--json', 'Output as JSON')
@@ -23,7 +23,8 @@ export function registerUserTweetsCommand(program: Command, ctx: CliContext): vo
         `\n${ctx.colors.section('Command Examples')}\n${[
           formatExample('bird user-tweets @steipete', 'Get recent tweets from a user'),
           formatExample('bird user-tweets steipete -n 10', 'Get 10 tweets (@ is optional)'),
-          formatExample('bird user-tweets @steipete --pages 3', 'Fetch 3 pages of tweets'),
+          formatExample('bird user-tweets @steipete -n 50', 'Fetch 50 tweets (paged)'),
+          formatExample('bird user-tweets @steipete --max-pages 3 -n 200', 'Safety cap (max 3 pages)'),
           formatExample('bird user-tweets @steipete --json', 'Output as JSON'),
           formatExample('bird user-tweets @steipete --cursor "DAABCg..."', 'Resume from cursor'),
         ].join('\n')}`,
@@ -33,7 +34,7 @@ export function registerUserTweetsCommand(program: Command, ctx: CliContext): vo
         handle: string,
         cmdOpts: {
           count?: string;
-          pages?: string;
+          maxPages?: string;
           delay?: string;
           cursor?: string;
           json?: boolean;
@@ -44,7 +45,7 @@ export function registerUserTweetsCommand(program: Command, ctx: CliContext): vo
         const timeoutMs = ctx.resolveTimeoutFromOptions(opts);
         const quoteDepth = ctx.resolveQuoteDepthFromOptions(opts);
         const count = Number.parseInt(cmdOpts.count || '20', 10);
-        const maxPages = Math.min(Number.parseInt(cmdOpts.pages || '1', 10), 10); // Hard cap at 10 pages
+        const maxPages = cmdOpts.maxPages ? Number.parseInt(cmdOpts.maxPages, 10) : undefined;
         const pageDelayMs = Number.parseInt(cmdOpts.delay || '1000', 10);
 
         // Validate inputs
@@ -52,8 +53,17 @@ export function registerUserTweetsCommand(program: Command, ctx: CliContext): vo
           console.error(`${ctx.p('err')}Invalid --count. Expected a positive integer.`);
           process.exit(2);
         }
-        if (!Number.isFinite(maxPages) || maxPages <= 0) {
-          console.error(`${ctx.p('err')}Invalid --pages. Expected a positive integer (max: 10).`);
+        const pageSize = 20;
+        const hardMaxPages = 10;
+        const hardMaxTweets = pageSize * hardMaxPages;
+        if (count > hardMaxTweets) {
+          console.error(
+            `${ctx.p('err')}Invalid --count. Max ${hardMaxTweets} tweets per run (safety cap: ${hardMaxPages} pages). Use --cursor to continue.`,
+          );
+          process.exit(2);
+        }
+        if (maxPages !== undefined && (!Number.isFinite(maxPages) || maxPages <= 0 || maxPages > hardMaxPages)) {
+          console.error(`${ctx.p('err')}Invalid --max-pages. Expected a positive integer (max: ${hardMaxPages}).`);
           process.exit(2);
         }
         if (!Number.isFinite(pageDelayMs) || pageDelayMs < 0) {
@@ -95,33 +105,21 @@ export function registerUserTweetsCommand(program: Command, ctx: CliContext): vo
         console.error(`${ctx.p('info')}Fetching tweets from ${displayName}...`);
 
         const includeRaw = cmdOpts.jsonFull ?? false;
-        const usePagination = maxPages > 1 || cmdOpts.cursor;
-
-        let result: Awaited<ReturnType<typeof client.getUserTweetsPaged>>;
-        if (usePagination) {
-          result = await client.getUserTweetsPaged(userLookup.userId, {
-            includeRaw,
-            maxPages,
-            cursor: cmdOpts.cursor,
-            pageDelayMs,
-          });
-        } else {
-          result = await client.getUserTweets(userLookup.userId, count, { includeRaw });
-        }
+        const wantsPaginationOutput = Boolean(cmdOpts.cursor) || maxPages !== undefined || count > pageSize;
+        const result = await client.getUserTweetsPaged(userLookup.userId, count, {
+          includeRaw,
+          maxPages,
+          cursor: cmdOpts.cursor,
+          pageDelayMs,
+        });
 
         if (result.success && result.tweets) {
-          // Trim to count if single page
-          let tweets = result.tweets;
-          if (!usePagination && tweets.length > count) {
-            tweets = tweets.slice(0, count);
-          }
-
           const isJson = cmdOpts.json || cmdOpts.jsonFull;
-          if (isJson && usePagination) {
+          if (isJson && wantsPaginationOutput) {
             // Include nextCursor for pagination consumers
-            console.log(JSON.stringify({ tweets, nextCursor: result.nextCursor ?? null }, null, 2));
+            console.log(JSON.stringify({ tweets: result.tweets, nextCursor: result.nextCursor ?? null }, null, 2));
           } else {
-            ctx.printTweets(tweets, {
+            ctx.printTweets(result.tweets, {
               json: isJson,
               emptyMessage: `No tweets found for @${username}.`,
             });
