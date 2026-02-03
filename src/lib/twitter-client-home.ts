@@ -61,6 +61,9 @@ export function withHome<TBase extends AbstractConstructor<TwitterClientBase>>(
     ): Promise<SearchResult> {
       const { includeRaw = false } = options;
       const features = buildHomeTimelineFeatures();
+      if (operation === 'HomeLatestTimeline') {
+        features['graphql_is_translatable_rweb_tweet_is_translatable_enabled'] = false;
+      }
       const pageSize = 20;
       const seen = new Set<string>();
       const tweets: TweetData[] = [];
@@ -81,20 +84,31 @@ export function withHome<TBase extends AbstractConstructor<TwitterClientBase>>(
             latestControlAvailable: true,
             requestContext: 'launch',
             withCommunity: true,
+            withSuperFollowsUserFields: true,
+            withDownvotePerspective: false,
+            withReactionsMetadata: false,
+            withReactionsPerspective: false,
+            withSuperFollowsTweetFields: true,
+            seenTweetIds: [],
             ...(pageCursor ? { cursor: pageCursor } : {}),
           };
 
-          const params = new URLSearchParams({
-            variables: JSON.stringify(variables),
-            features: JSON.stringify(features),
-          });
-
-          const url = `${TWITTER_API_BASE}/${queryId}/${operation}?${params.toString()}`;
+          const url = `${TWITTER_API_BASE}/${queryId}/${operation}`;
+          // console.error(`[Debug] Fetching ${operation} with Query ID: ${queryId}`);
+          // console.error(`[Debug] Variables: ${JSON.stringify(variables)}`);
 
           try {
             const response = await this.fetchWithTimeout(url, {
-              method: 'GET',
-              headers: this.getHeaders(),
+              method: 'POST',
+              headers: {
+                ...this.getHeaders(),
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({
+                variables,
+                features,
+                queryId,
+              }),
             });
 
             if (response.status === 404) {
@@ -131,10 +145,20 @@ export function withHome<TBase extends AbstractConstructor<TwitterClientBase>>(
 
             if (data.errors && data.errors.length > 0) {
               const errorMessage = data.errors.map((e) => e.message).join(', ');
+              // console.error(`[Debug] Error response for ${queryId}:`, JSON.stringify(data.errors, null, 2));
+              const isMismatch = isQueryIdMismatch(data.errors);
+              
+              if (isMismatch) {
+                // console.error(`[Debug] Query ID mismatch for ${queryId}: ${errorMessage}`);
+                had404 = true;
+                lastError = errorMessage;
+                continue;
+              }
+
               return {
                 success: false as const,
                 error: errorMessage,
-                had404: had404 || isQueryIdMismatch(data.errors),
+                had404: had404 || isMismatch,
               };
             }
 

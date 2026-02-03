@@ -229,6 +229,9 @@ export function buildListsFeatures(): Record<string, boolean> {
 export function buildHomeTimelineFeatures(): Record<string, boolean> {
   return applyFeatureOverrides('homeTimeline', {
     ...buildTimelineFeatures(),
+    responsive_web_graphql_exclude_directive_enabled: true,
+    responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+    responsive_web_graphql_timeline_navigation_enabled: true,
   });
 }
 

@@ -6,6 +6,9 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { installGlobalProxy } from '../src/lib/proxy.js';
+
+installGlobalProxy();
 
 const TARGET_OPERATIONS = [
   'CreateTweet',
@@ -29,6 +32,8 @@ const TARGET_OPERATIONS = [
   'GenericTimelineById',
   'TrendHistory',
   'AboutAccountQuery',
+  'HomeTimeline',
+  'HomeLatestTimeline',
 ] as const;
 
 type OperationName = (typeof TARGET_OPERATIONS)[number];
